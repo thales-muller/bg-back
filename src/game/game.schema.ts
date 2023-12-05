@@ -20,7 +20,7 @@ export class Game {
   @Prop({ type: [Team], required: true })
   teams: Team[];
 
-  @Prop({ type: [String], required: true })
+  @Prop({ type: [String], default: [] })
   words: string[];
 
   @Prop({

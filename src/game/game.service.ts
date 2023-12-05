@@ -6,10 +6,11 @@ import { Game, GameDocument } from './game.schema';
 import { CreateGameDto, UpdateGameDto } from './dto/game.dto';
 import { AddWordDto } from './dto/add-word.dto';
 import { DeleteWordDto } from './dto/delete-word.dto';
+import { GameStatus } from 'src/enum/status.enum';
 
 @Injectable()
 export class GameService {
-  constructor(@InjectModel(Game.name) private readonly gameModel: Model<GameDocument>) {}
+  constructor(@InjectModel(Game.name) private readonly gameModel: Model<GameDocument>) { }
 
   /**
    * Get all games.
@@ -52,6 +53,7 @@ export class GameService {
    */
   async addWord(addWordDto: AddWordDto): Promise<Game> {
     const { gameId, word } = addWordDto;
+    const lowercaseWord = word.toLowerCase();
 
     try {
       const game = await this.gameModel.findById(gameId).exec();
@@ -59,13 +61,66 @@ export class GameService {
         throw new NotFoundException('Game not found');
       }
 
+      // Check if the game already in progress
+      if (game.status == GameStatus.IN_PROGRESS) {
+        throw new BadRequestException('The game already has been started');
+      }
+
+      // Check if the game already have finished
+      if (game.status == GameStatus.FINISHED) {
+        throw new BadRequestException('The game already has finished');
+      }
+
       // Check if the word already exists in the array
-      if (game.words.includes(word)) {
+      if (game.words.includes(lowercaseWord)) {
         throw new BadRequestException('Word already exists in the game');
       }
 
       // Add the word to the array
-      game.words.push(word);
+      game.words.push(lowercaseWord);
+
+      // Save the updated game document
+      return game.save();
+    } catch (error) {
+      // Handle specific errors or log them
+      throw error; // Rethrow the error or handle it as needed
+    }
+  }
+
+  /**
+ * Delete a word from the game's word array.
+ * @param {DeleteWordDto} deleteWordDto - The data to delete a word from the game.
+ * @returns {Promise<Game>} A promise that resolves to the updated game.
+ * @throws {NotFoundException} Thrown if the game is not found.
+ * @throws {BadRequestException} Thrown if the word does not exist in the game.
+ */
+  async deleteWord(deleteWordDto: DeleteWordDto): Promise<Game> {
+    const { gameId, word } = deleteWordDto;
+    const lowercaseWord = word.toLowerCase();
+
+    try {
+      const game = await this.gameModel.findById(gameId).exec();
+      if (!game) {
+        throw new NotFoundException('Game not found');
+      }
+
+      // Check if the word exists in the array
+      if (!game.words.includes(lowercaseWord)) {
+        throw new BadRequestException('Word does not exist in the game');
+      }
+
+      // Check if the game already in progress
+      if (game.status == GameStatus.IN_PROGRESS) {
+        throw new BadRequestException('The game already has been started');
+      }
+
+      // Check if the game already have finished
+      if (game.status == GameStatus.FINISHED) {
+        throw new BadRequestException('The game already has finished');
+      }
+
+      // Delete the word from the array
+      game.words = game.words.filter((w) => w !== lowercaseWord);
 
       // Save the updated game document
       return game.save();
@@ -105,35 +160,4 @@ export class GameService {
     }
   }
 
-  /**
-   * Delete a word from the game's word array.
-   * @param {DeleteWordDto} deleteWordDto - The data to delete a word from the game.
-   * @returns {Promise<Game>} A promise that resolves to the updated game.
-   * @throws {NotFoundException} Thrown if the game is not found.
-   * @throws {BadRequestException} Thrown if the word does not exist in the game.
-   */
-  async deleteWord(deleteWordDto: DeleteWordDto): Promise<Game> {
-    const { gameId, word } = deleteWordDto;
-
-    try {
-      const game = await this.gameModel.findById(gameId).exec();
-      if (!game) {
-        throw new NotFoundException('Game not found');
-      }
-
-      // Check if the word exists in the array
-      if (!game.words.includes(word)) {
-        throw new BadRequestException('Word does not exist in the game');
-      }
-
-      // Delete the word from the array
-      game.words = game.words.filter((w) => w !== word);
-
-      // Save the updated game document
-      return game.save();
-    } catch (error) {
-      // Handle specific errors or log them
-      throw error; // Rethrow the error or handle it as needed
-    }
-  }
 }
